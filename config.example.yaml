@@ -1,0 +1,64 @@
+# AtomicWatcherAquarium (AWA) Configuration Example
+#
+# Copy this file to config.yaml and customize it for your setup:
+#   cp config.example.yaml config.yaml
+
+# Notification providers configuration
+notifier:
+  # Console notifier - displays notifications in terminal with rich markdown formatting
+  console:
+    enabled: true
+    enable_rich_markdown_formatting: true
+
+  # Ntfy notifier - sends push notifications to ntfy.sh server
+  ntfy:
+    enabled: false # Set to true to enable ntfy notifications
+    url: "http://127.0.0.1:20403" # Your ntfy server URL (or use https://ntfy.sh)
+    topic: "awa" # Topic name for notifications
+
+# Watchers configuration
+watchers:
+  # IMAP Email Watcher
+  # Monitors email accounts for new messages with optional LLM-powered summarization
+  imap_watcher:
+    enabled: false # Set to true to enable this watcher
+    interval_seconds: 60 # Check for new emails every 60 seconds
+    watching:
+      # First email account example
+      - server: "mail.example.com" # IMAP server address
+        enabled: false # Set to true to enable this account
+        username: "your-email@example.com" # Your email address
+        password: "your-password" # Your email password or app password
+        enable_summary: false # Enable LLM summarization of email content. If 
+        summary:
+          model_name: "gpt-5-mini" # LLM model to use (requires OpenAI API key in environment)
+          prompt: "Please summarize this email in 1-2 sentences. Keep it concise and capture the main idea."
+
+  # System Resource Watcher
+  # Monitors CPU and RAM usage, sends alerts when thresholds are exceeded
+  system_watcher:
+    enabled: false # Set to true to enable this watcher
+    interval_seconds: 2 # Check system resources every 2 seconds
+    cpu_threshold: 95 # Alert when CPU usage exceeds 95%
+    ram_threshold: 95 # Alert when RAM usage exceeds 95%
+    cooldown_seconds: 60 # Wait 60 seconds between alerts to prevent spam
+
+  # RSS Feed Watcher
+  # Monitors RSS/Atom feeds with optional AI-powered content filtering
+  rss_watcher:
+    enabled: false # Set to true to enable this watcher
+    interval_seconds: 3600 # Check feeds every hour (3600 seconds)
+    watching:
+      # First RSS feed example
+      - url: "https://example.com/feed.xml" # RSS/Atom feed URL
+        name: "Example Blog" # Display name for this feed
+        enabled: false # Set to true to enable this feed
+        enable_digest: false # Use LLM to create a digest of relevant entries. If false, all new entries are notified.
+        digest:
+          model_name: "gpt-4" # LLM model to use
+          prompt: |
+            Review the following RSS feed entries and select only the most relevant and interesting ones.
+            Provide a concise digest with titles and links.
+            If no entries are relevant, respond with: "No relevant entries found."
+  
+# - For LLM features (email summaries, RSS digests), set OPENAI_API_KEY environment variable

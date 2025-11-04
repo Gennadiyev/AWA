@@ -1,0 +1,23 @@
+[project]
+name = "atomic-watcher-aquarium"
+version = "0.1.0"
+description = "A hackable, asynchronous, modular monitoring and notification system"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+	"PyYAML",
+	"loguru",
+	"rich",
+	"python-ntfy",
+	"psutil",
+	"feedparser",
+	"httpx",
+	"openai",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = []
