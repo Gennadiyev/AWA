@@ -153,6 +153,12 @@ class LarkNotifier(BaseNotifier):
         except Exception as e:
             logger.error(f"Error sending Lark notification: {e}", exc_info=True)
 
+    async def close(self) -> None:
+        """Close the aiohttp session"""
+        if self.session is not None:
+            await self.session.close()
+            self.session = None
+
 
 class Notifier:
     """Main notifier class that manages multiple notification providers. This class handles the configuration file and initializes the appropriate notifier instances based on the provided settings."""
@@ -175,6 +181,11 @@ class Notifier:
         ntfy_config = config.get("ntfy", {})
         if ntfy_config.get("enabled", False):
             self.notifiers.append(NtfyNotifier(ntfy_config))
+
+        # Initialize lark notifier if configured
+        lark_config = config.get("lark", {})
+        if lark_config.get("enabled", False):
+            self.notifiers.append(LarkNotifier(lark_config))
 
         logger.info(
             f"Notifier system initialized with {len(self.notifiers)} provider(s)"
@@ -199,4 +210,7 @@ class Notifier:
 
     async def close(self):
         """Close/cleanup all notifiers"""
+        for notifier in self.notifiers:
+            if hasattr(notifier, "close"):
+                await notifier.close()
         logger.info("Notifier system closed")

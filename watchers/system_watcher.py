@@ -55,7 +55,7 @@ class SystemMonitor:
         psutil.cpu_percent(interval=None)
         await asyncio.sleep(0.1)
 
-    def get_system_metrics(self) -> tuple[float, float, psutil._pslinux.svmem]:
+    def get_system_metrics(self) -> tuple[float, float, Any]:
         """
         Get current system metrics.
 
@@ -99,7 +99,7 @@ CPU usage has exceeded the configured threshold.
         self.last_cpu_alert_time = time.time()
 
     async def send_ram_alert(
-        self, ram_percent: float, memory: psutil._pslinux.svmem
+        self, ram_percent: float, memory: Any
     ) -> None:
         """
         Send RAM usage alert notification.

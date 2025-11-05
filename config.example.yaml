@@ -16,6 +16,11 @@ notifier:
     url: "http://127.0.0.1:20403" # Your ntfy server URL (or use https://ntfy.sh)
     topic: "awa" # Topic name for notifications
 
+  # Lark (Feishu) notifier - sends messages to Lark via webhook
+  lark:
+    enabled: false # Set to true to enable Lark notifications
+    webhook_url: "https://open.feishu.cn/open-apis/bot/v2/hook/YOUR_WEBHOOK_TOKEN" # Your Lark webhook URL
+
 # Watchers configuration
 watchers:
   # IMAP Email Watcher
