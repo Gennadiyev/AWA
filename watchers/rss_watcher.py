@@ -85,7 +85,7 @@ class RSSFeed:
             Parsed feed object or None if failed
         """
         try:
-            logger.info(f"Fetching RSS feed: {self}")
+            logger.debug(f"Fetching RSS feed: {self}")
             # Use asyncio.to_thread for blocking feedparser call
             feed = await asyncio.to_thread(feedparser.parse, self.url)
 
@@ -101,7 +101,6 @@ class RSSFeed:
                 logger.warning(f"No entries found in feed: {self}")
                 return None
 
-            logger.info(f"Fetched {len(feed.entries)} entries from {self}")
             return feed
 
         except Exception as e:
@@ -147,7 +146,7 @@ class RSSFeed:
         if new_entries:
             logger.info(f"Found {len(new_entries)} new entries (out of {total_entries} total) in {self}")
         else:
-            logger.info(f"No new entries found (checked {total_entries} entries) in {self}")
+            logger.debug(f"No new entries found (checked {total_entries} entries) in {self}")
 
         return new_entries
 
@@ -195,7 +194,6 @@ class RSSMonitor:
 
         for feed_config in watching_configs:
             if not feed_config.get("enabled", True):
-                logger.info(f"Skipping disabled feed: {feed_config.get('url')}")
                 continue
 
             feed = RSSFeed(feed_config)
@@ -239,7 +237,7 @@ class RSSMonitor:
                 )
 
                 # Check if LLM found no relevant entries
-                if "no relevant entries" in digest.lower():
+                if "no relevant entries" in digest.lower().strip(".\"'"):
                     logger.info(f"No relevant entries found by LLM for {feed}")
                     return
 
@@ -261,8 +259,6 @@ class RSSMonitor:
 
         # Send notification
         await self.notifier.send(markdown_content)
-
-        logger.info(f"Sent notification for {len(entries)} entries from {feed}")
 
     def format_simple_list_markdown(
         self, feed: RSSFeed, entries: list[dict[str, Any]]
