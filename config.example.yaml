@@ -2,6 +2,16 @@
 #
 # Copy this file to config.yaml and customize it for your setup:
 #   cp config.example.yaml config.yaml
+#
+# Environment Variables Support:
+#   - AWA automatically loads .env file from the project root
+#   - Use ${VAR_NAME} syntax to reference environment variables
+#   - Use ${VAR_NAME:-default_value} to provide default values
+#   - Example: password: "${EMAIL_PASSWORD}" or password: "${EMAIL_PASSWORD:-fallback}"
+#
+# Security Best Practice:
+#   Store sensitive information (passwords, API keys, tokens) in .env file
+#   instead of committing them in config.yaml
 
 # Notification providers configuration
 notifier:
@@ -19,7 +29,7 @@ notifier:
   # Lark (Feishu) notifier - sends messages to Lark via webhook
   lark:
     enabled: false # Set to true to enable Lark notifications
-    webhook_url: "https://open.feishu.cn/open-apis/bot/v2/hook/YOUR_WEBHOOK_TOKEN" # Your Lark webhook URL
+    webhook_url: "${LARK_WEBHOOK_URL}" # Your Lark webhook URL (recommended: store in .env)
 
 # Watchers configuration
 watchers:
@@ -33,10 +43,10 @@ watchers:
       - server: "mail.example.com" # IMAP server address
         enabled: false # Set to true to enable this account
         username: "your-email@example.com" # Your email address
-        password: "your-password" # Your email password or app password
-        enable_summary: false # Enable LLM summarization of email content. If 
+        password: "${EMAIL_PASSWORD}" # Your email password (recommended: store in .env)
+        enable_summary: false # Enable LLM summarization of email content. If
         summary:
-          model_name: "gpt-5-mini" # LLM model to use (requires OpenAI API key in environment)
+          model_name: "gpt-4o-mini" # LLM model to use, requires plugins/configs/llm.json setup
           prompt: "Please summarize this email in 1-2 sentences. Keep it concise and capture the main idea."
 
   # System Resource Watcher

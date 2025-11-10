@@ -144,9 +144,13 @@ class RSSFeed:
 
         # Always log the results for visibility
         if new_entries:
-            logger.info(f"Found {len(new_entries)} new entries (out of {total_entries} total) in {self}")
+            logger.info(
+                f"Found {len(new_entries)} new entries (out of {total_entries} total) in {self}"
+            )
         else:
-            logger.debug(f"No new entries found (checked {total_entries} entries) in {self}")
+            logger.debug(
+                f"No new entries found (checked {total_entries} entries) in {self}"
+            )
 
         return new_entries
 

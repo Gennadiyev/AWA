@@ -6,13 +6,45 @@ Entry point that discovers and runs all watchers
 import argparse
 import asyncio
 import importlib
+import os
+import re
 import sys
 from pathlib import Path
 
 import yaml
+from dotenv import load_dotenv
 from loguru import logger
 
 from notifier import Notifier
+
+
+def expand_env_vars(config):
+    """
+    Recursively expand environment variables in config.
+    Supports ${VAR_NAME} and ${VAR_NAME:-default_value} syntax.
+
+    Args:
+        config: Configuration dictionary, list, or string value
+
+    Returns:
+        Configuration with environment variables expanded
+    """
+    if isinstance(config, dict):
+        return {key: expand_env_vars(value) for key, value in config.items()}
+    elif isinstance(config, list):
+        return [expand_env_vars(item) for item in config]
+    elif isinstance(config, str):
+        # Pattern to match ${VAR_NAME} or ${VAR_NAME:-default_value}
+        pattern = r"\$\{([^}:]+)(?::-(.*?))?\}"
+
+        def replace_env_var(match):
+            var_name = match.group(1)
+            default_value = match.group(2) if match.group(2) is not None else ""
+            return os.environ.get(var_name, default_value)
+
+        return re.sub(pattern, replace_env_var, config)
+    else:
+        return config
 
 
 # Setup loguru logging
@@ -76,22 +108,36 @@ async def discover_watchers():
     return watcher_modules
 
 
-async def main(verbose: bool = False):
+async def main(verbose: bool = False, config_file: str = "config.yaml"):
     """Main entry point"""
+    # Load .env file from the project root directory
+    env_path = Path(__file__).parent / ".env"
+    if env_path.exists():
+        load_dotenv(env_path)
+        logger.debug(f"Loaded environment variables from {env_path}")
+
     # Setup logging based on verbose flag
     setup_logging(enable_console_logging=verbose)
 
     # Load configuration
-    config_path = Path(__file__).parent / "config.yaml"
+    config_path = (
+        Path(config_file)
+        if Path(config_file).is_absolute()
+        else Path(__file__).parent / config_file
+    )
     if not config_path.exists():
-        logger.error("config.yaml not found! Please create it from config.example.yaml")
+        logger.error(
+            f"{config_file} not found! Please create it from config.example.yaml"
+        )
         sys.exit(1)
 
     try:
         with open(config_path, "r") as f:
             config = yaml.safe_load(f)
+        # Expand environment variables in the config
+        config = expand_env_vars(config)
     except Exception as e:
-        logger.error(f"Failed to load config.yaml: {e}")
+        logger.error(f"Failed to load {config_file}: {e}")
         sys.exit(1)
 
     logger.info("AtomicWatcherAquarium starting")
@@ -180,10 +226,17 @@ if __name__ == "__main__":
         action="store_true",
         help="Enable verbose console logging (logs also go to ./logs/awa.log)",
     )
+    parser.add_argument(
+        "--config_file",
+        "-c",
+        type=str,
+        default="config.yaml",
+        help="Path to configuration file (default: config.yaml)",
+    )
     args = parser.parse_args()
 
     try:
-        asyncio.run(main(verbose=args.verbose))
+        asyncio.run(main(verbose=args.verbose, config_file=args.config_file))
     except KeyboardInterrupt:
         logger.info("AWA terminated by user")
     except Exception as e:

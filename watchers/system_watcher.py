@@ -98,9 +98,7 @@ CPU usage has exceeded the configured threshold.
         await self.notifier.send(markdown_content)
         self.last_cpu_alert_time = time.time()
 
-    async def send_ram_alert(
-        self, ram_percent: float, memory: Any
-    ) -> None:
+    async def send_ram_alert(self, ram_percent: float, memory: Any) -> None:
         """
         Send RAM usage alert notification.
 

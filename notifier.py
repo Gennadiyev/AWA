@@ -126,10 +126,13 @@ class LarkNotifier(BaseNotifier):
             if self.session is None:
                 # Import here to avoid dependency if not using LarkNotifier
                 import aiohttp
+
                 self.session = aiohttp.ClientSession()
 
             # Try to get the title using regex
-            title_match = re.search(r"^#\s+(.+)$", markdown_content.strip(), re.MULTILINE)
+            title_match = re.search(
+                r"^#\s+(.+)$", markdown_content.strip(), re.MULTILINE
+            )
             title = title_match.group(1) if title_match else "Notification"
 
             # Send the markdown content as a Lark message
@@ -142,14 +145,21 @@ class LarkNotifier(BaseNotifier):
                         "template": "blue",
                     },
                     "body": {
-                        "elements": [{"tag": "markdown","content": markdown_content,}],
-                    }
-                }
+                        "elements": [
+                            {
+                                "tag": "markdown",
+                                "content": markdown_content,
+                            }
+                        ],
+                    },
+                },
             }
             async with self.session.post(self.webhook_url, json=payload) as response:
                 if response.status != 200:
                     text = await response.text()
-                    raise Exception(f"Failed to send Lark notification: {response.status}, {text}")
+                    raise Exception(
+                        f"Failed to send Lark notification: {response.status}, {text}"
+                    )
         except Exception as e:
             logger.error(f"Error sending Lark notification: {e}", exc_info=True)
 

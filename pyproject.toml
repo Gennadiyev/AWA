@@ -13,6 +13,8 @@ dependencies = [
 	"psutil",
 	"feedparser",
 	"openai",
+	"openreview-py",
+	"python-dotenv"
 ]
 
 [build-system]
