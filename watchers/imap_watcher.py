@@ -194,12 +194,13 @@ class EmailAccount:
     def decode_header_value(header_value: Optional[str]) -> str:
         """
         Decode email header value (handles encoded subjects/names).
+        Also normalizes whitespace from folded headers.
 
         Args:
             header_value: Raw header value
 
         Returns:
-            Decoded string
+            Decoded string with normalized whitespace
         """
         if not header_value:
             return ""
@@ -211,7 +212,14 @@ class EmailAccount:
             else:
                 decoded_parts.append(part)
 
-        return "".join(decoded_parts)
+        # Join parts and normalize whitespace (handle folded headers)
+        result = "".join(decoded_parts)
+        # Replace newlines and carriage returns with spaces
+        result = result.replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
+        # Collapse multiple spaces into single spaces
+        result = " ".join(result.split())
+
+        return result
 
     @staticmethod
     def extract_body(email_message: email.message.Message) -> str:
@@ -316,7 +324,7 @@ class ImapMonitor:
             logger.info(f"Summarizing email from {sender}")
             try:
                 summary = await llm_query(
-                    message=f"Subject: {subject}\n\nBody:\n{body[:2000]}",  # Limit body length
+                    message=f"Subject: {subject}\n\nBody:\n{body[:10000]}",  # Limit body length
                     model=account.summary_model,
                     system_message=account.summary_prompt,
                 )
@@ -330,8 +338,8 @@ class ImapMonitor:
             except Exception as e:
                 logger.error(f"Failed to summarize email: {e}")
                 # Fallback to original content
-                truncated_body = body[:500]
-                if len(body) > 500:
+                truncated_body = body[:2500]
+                if len(body) > 2500:
                     truncated_body += "..."
                 markdown_content = f"""# 📧 {subject}
 
@@ -341,8 +349,8 @@ class ImapMonitor:
 """
         else:
             # Use original content (truncated)
-            truncated_body = body[:500]
-            if len(body) > 500:
+            truncated_body = body[:2500]
+            if len(body) > 2500:
                 truncated_body += "..."
             markdown_content = f"""# 📧 {subject}
 
