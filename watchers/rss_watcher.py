@@ -68,7 +68,7 @@ class RSSFeed:
         # LLM Filter configuration
         self.enable_llm_filter: bool = bool(feed_config.get("enable_llm_filter", False))
         llm_filter_config = feed_config.get("llm_filter", {})
-        llm_filter_dict: dict[str, str] = llm_filter_config if isinstance(llm_filter_config, dict) else {}
+        llm_filter_dict: dict[str, str | int] = llm_filter_config if isinstance(llm_filter_config, dict) else {}
         self.llm_filter_prompt: str = str(llm_filter_dict.get("prompt", DEFAULT_LLM_FILTER_PROMPT))
         llm_filter_model_name = llm_filter_dict.get("model_name")
         self.llm_filter_model: str = str(llm_filter_model_name) if llm_filter_model_name else ""
