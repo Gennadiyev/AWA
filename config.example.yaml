@@ -81,6 +81,15 @@ watchers:
             Review the following RSS feed entries and select only the most relevant and interesting ones.
             Provide a concise digest with titles and links.
             If no entries are relevant, respond with: "No relevant entries found."
+        enable_llm_filter: false # Use LLM to filter entries for relevance
+        llm_filter:
+          model_name: "gpt-4o-mini" # LLM model to use
+          prompt: |
+            Evaluate the recommendation score of the following RSS feed entry to current events.
+            The score ranges from 0 (not relevant) to 5 (highly relevant).
+            Respond with only the score in the format: \\boxed{score}.
+          max_concurrent_queries: 50 # Max concurrent LLM filter queries (default: 50)
+          score_threshold: 3 # Minimum score (0-5) to consider entry relevant
 
   # OpenReview Watcher
   # Monitors OpenReview submissions for new reviews, comments, and status changes
