@@ -398,7 +398,7 @@ class RSSMonitor:
                     system_message=feed.llm_filter_prompt,
                 )
                 # Score: \boxed{xxx}
-                matches = re.findall(r"\\boxed{(\d+)}", response)
+                matches = re.findall(r"\\boxed{\s*(\d+)\s*}", response)
                 if matches:
                     score = int(matches[0])
                     return score >= 3
