@@ -214,7 +214,7 @@ class RSSFeed:
 
         total_entries = len(feed.entries)  # type: ignore[attr-defined]
         if total_entries == 0:
-            logger.debug("There is no entries in the fetched feed!")
+            logger.debug("There are no entries in the fetched feed!")
 
         # Extract all current entries
         current_entries: list[JsonSerializable] = [
