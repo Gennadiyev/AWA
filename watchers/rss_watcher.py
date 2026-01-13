@@ -403,7 +403,13 @@ class RSSMonitor:
                     score = int(matches[0])
                     return score >= 3
                 else:
-                    return False
+                    logger.warning(
+                        "LLM filter response missing valid \\boxed{} score for entry '{title}'. "
+                        "Falling back to including entry. Raw response: {response_snippet}",
+                        title=entry.get("title", "<no title>"),
+                        response_snippet=response[:200],
+                    )
+                    return True
 
         # Create tasks for all entries
         tasks = [is_entry_relevant(entry) for entry in entries]
