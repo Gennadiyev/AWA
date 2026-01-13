@@ -397,7 +397,7 @@ class RSSMonitor:
                     model=feed.llm_filter_model,
                     system_message=feed.llm_filter_prompt,
                 )
-                # Score: \boxed{xxx}
+                # Extract score from LLM response in format: \boxed{score}
                 matches = re.findall(r"\\boxed{\s*(\d+)\s*}", response)
                 if matches:
                     score = int(matches[0])
