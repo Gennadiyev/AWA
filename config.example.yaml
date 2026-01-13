@@ -89,6 +89,7 @@ watchers:
             The score ranges from 0 (not relevant) to 5 (highly relevant).
             Respond with only the score in the format: \\boxed{score}.
           max_concurrent_queries: 50 # Max concurrent LLM filter queries (default: 50)
+          score_threshold: 3 # Minimum score (0-5) to consider entry relevant
 
   # OpenReview Watcher
   # Monitors OpenReview submissions for new reviews, comments, and status changes

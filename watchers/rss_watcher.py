@@ -73,6 +73,7 @@ class RSSFeed:
         llm_filter_model_name = llm_filter_dict.get("model_name")
         self.llm_filter_model: str = str(llm_filter_model_name) if llm_filter_model_name else ""
         self.max_concurrent_llm_filter_queries: int = int(llm_filter_dict.get("max_concurrent_queries", 50))
+        self.llm_filter_score_threshold: int = int(llm_filter_dict.get("score_threshold", 3))
 
         # Initialize StateDiff for persistent state tracking
         # Use hash of URL combined with cache_id to ensure uniqueness per user per feed
@@ -401,7 +402,7 @@ class RSSMonitor:
                 matches = re.findall(r"\\boxed{\s*(\d+)\s*}", response)
                 if matches:
                     score = int(matches[0])
-                    return score >= 3
+                    return score >= feed.llm_filter_score_threshold
                 else:
                     logger.warning(
                         "LLM filter response missing valid \\boxed{} score for entry '{title}'. "
