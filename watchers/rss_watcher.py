@@ -7,6 +7,7 @@ Version 0.2.0 - Refactored with StateDiff plugin for persistent state tracking
 
 import asyncio
 import hashlib
+import re
 from collections.abc import Coroutine
 
 import aiohttp
@@ -25,6 +26,11 @@ DEFAULT_DIGEST_PROMPT = (
     "Review the following RSS feed entries and select the most important and relevant ones. "
     "Return a concise digest with entry titles and links. "
     "If no entries are relevant, respond with 'No relevant entries found.'"
+)
+DEFAULT_LLM_FILTER_PROMPT = (
+    "Evaluate the recommendation score of the following RSS feed entry to current events. "
+    "The score ranges from 0 (not relevant) to 5 (highly relevant). "
+    "Respond with only the score in the format: \\boxed{score}."
 )
 
 type EntryData = dict[str, str]
@@ -56,8 +62,17 @@ class RSSFeed:
         digest_config = feed_config.get("digest", {})
         digest_dict: dict[str, str] = digest_config if isinstance(digest_config, dict) else {}
         self.digest_prompt: str = str(digest_dict.get("prompt", DEFAULT_DIGEST_PROMPT))
-        model_name = digest_dict.get("model_name")
-        self.digest_model: str = str(model_name) if model_name else ""
+        digest_model_name = digest_dict.get("model_name")
+        self.digest_model: str = str(digest_model_name) if digest_model_name else ""
+
+        # LLM Filter configuration
+        self.enable_llm_filter: bool = bool(feed_config.get("enable_llm_filter", False))
+        llm_filter_config = feed_config.get("llm_filter", {})
+        llm_filter_dict: dict[str, str] = llm_filter_config if isinstance(llm_filter_config, dict) else {}
+        self.llm_filter_prompt: str = str(llm_filter_dict.get("prompt", DEFAULT_LLM_FILTER_PROMPT))
+        llm_filter_model_name = llm_filter_dict.get("model_name")
+        self.llm_filter_model: str = str(llm_filter_model_name) if llm_filter_model_name else ""
+        self.max_concurrent_llm_filter_queries: int = int(llm_filter_dict.get("max_concurrent_queries", 50))
 
         # Initialize StateDiff for persistent state tracking
         # Use hash of URL combined with cache_id to ensure uniqueness per user per feed
@@ -147,10 +162,6 @@ class RSSFeed:
         try:
             proxy_info = f" (via proxy {self.proxy})" if self.proxy else ""
             logger.warning(f"Fetching RSS feed: {self}{proxy_info}")
-            # Use asyncio.to_thread for blocking fetch call
-            # feed: feedparser.FeedParserDict = await asyncio.to_thread(
-            #     self._fetch_feed_sync
-            # )
             feed: feedparser.FeedParserDict = await self._fetch_feed_aiohttp()
 
             # Check for feed errors
@@ -203,7 +214,7 @@ class RSSFeed:
 
         total_entries = len(feed.entries)  # type: ignore[attr-defined]
         if total_entries == 0:
-            logger.warning("There is no entries in the fetched feed!")
+            logger.debug("There is no entries in the fetched feed!")
 
         # Extract all current entries
         current_entries: list[JsonSerializable] = [
@@ -226,7 +237,7 @@ class RSSFeed:
                 f"Found {len(new_entries)} new entries (out of {total_entries} total) in {self}"
             )
         else:
-            logger.warning(
+            logger.debug(
                 f"No new entries found (checked {total_entries} entries) in {self}"
             )
 
@@ -302,8 +313,30 @@ class RSSMonitor:
         if not entries:
             return
 
+        if feed.enable_llm_filter and feed.llm_filter_model:
+            # Use LLM to filter relevant entries
+            logger.info(f"Filtering {len(entries)} entries with LLM for {feed}")
+            try:
+                filtered_entries = await self.filter_entries_with_llm(
+                    feed=feed,
+                    entries=entries,
+                )
+
+                # Check if no entries were deemed relevant
+                if len(filtered_entries) == 0:
+                    logger.info(f"No relevant entries found by LLM for {feed}")
+                    return
+
+            except Exception as e:
+                logger.error(f"Failed to filter entries with LLM: {e}", exc_info=True)
+                # Fall back to unfiltered entries
+                filtered_entries = entries
+        else:
+            # All entries without filtering
+            filtered_entries = entries
+
         # Format entries for LLM
-        entries_text = feed.format_entries_for_llm(entries)
+        entries_text = feed.format_entries_for_llm(filtered_entries)
 
         if feed.enable_digest and feed.digest_model:
             # Use LLM to create digest
@@ -331,13 +364,59 @@ class RSSMonitor:
             except Exception as e:
                 logger.error(f"Failed to generate digest: {e}", exc_info=True)
                 # Fallback to simple list
-                markdown_content = self.format_simple_list_markdown(feed, entries)
+                markdown_content = self.format_simple_list_markdown(feed, filtered_entries)
         else:
-            # Simple notification without LLM
-            markdown_content = self.format_simple_list_markdown(feed, entries)
+            # Simple notification without LLM digest
+            markdown_content = self.format_simple_list_markdown(feed, filtered_entries)
 
         # Send notification
         await self.notifier.send(markdown_content)
+
+    async def filter_entries_with_llm(
+        self, feed: RSSFeed, entries: list[EntryData]
+    ) -> list[EntryData]:
+        """
+        Filter entries using LLM based on relevance.
+
+        Args:
+            feed: RSSFeed instance
+            entries: List of entry dictionaries
+
+        Returns:
+            List of relevant entry dictionaries
+        """
+        filtered_entries: list[EntryData] = []
+        semaphore = asyncio.Semaphore(feed.max_concurrent_llm_filter_queries)
+
+        async def is_entry_relevant(entry: EntryData) -> bool:
+            """Check if a single entry is relevant using LLM."""
+            async with semaphore:
+                entry_text = f"Title: {entry['title']}\nSummary: {entry['summary']}"
+                response = await llm_query(
+                    message=f"Entry:\n\n{entry_text}",
+                    model=feed.llm_filter_model,
+                    system_message=feed.llm_filter_prompt,
+                )
+                # Score: \boxed{xxx}
+                matches = re.findall(r"\\boxed{(\d+)}", response)
+                if matches:
+                    score = int(matches[0])
+                    return score >= 3
+                else:
+                    return False
+
+        # Create tasks for all entries
+        tasks = [is_entry_relevant(entry) for entry in entries]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Collect relevant entries
+        for entry, result in zip(entries, results):
+            if isinstance(result, Exception):
+                logger.debug(f"Error checking relevance for entry {entry['title']}: {result}", exc_info=True)
+                continue
+            if result:
+                filtered_entries.append(entry)
+        return filtered_entries
 
     def format_simple_list_markdown(
         self, feed: RSSFeed, entries: list[EntryData]
@@ -368,11 +447,8 @@ class RSSMonitor:
         """Check all configured RSS feeds for new entries."""
         for feed in self.feeds:
             try:
-                logger.info("I am going to get new entries")
                 new_entries = await feed.get_new_entries()
-                logger.info("I have got new entries and am going to process")
                 await self.process_entries(feed, new_entries)
-                logger.info("I have processed entries")
 
             except Exception as e:
                 logger.error(f"Error checking feed {feed}: {e}", exc_info=True)
@@ -391,9 +467,7 @@ class RSSMonitor:
 
         while True:
             try:
-                logger.info("I am going to check all feeds")
                 await self.check_all_feeds()
-                logger.info("I have checked all feeds")
                 await asyncio.sleep(self.interval)
 
             except asyncio.CancelledError:
