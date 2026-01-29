@@ -75,6 +75,8 @@ AWA supports multiple notification backends:
 
 **Console Notifier** - Rich markdown rendering in your terminal
 **Ntfy Notifier** - Push notifications to [ntfy.sh](https://ntfy.sh) (self-hosted or public)
+**Lark Notifier** - Send messages to Lark (Feishu) via webhook
+**OneBot-11 Notifier** - Send messages to OneBot-11 servers (supports QQ, Discord, Lark via adapters)
 
 More notifiers can be added by extending `BaseNotifier`.
 
@@ -143,6 +145,47 @@ notifier:
     headers:
       Authorization: "Bearer your-token"
 ```
+
+### OneBot-11 Notifier
+
+The OneBot-11 notifier allows AWA to send messages to OneBot-11 compatible servers, which provides indirect support for multiple platforms including QQ, Discord, Lark, and more through protocol adapters.
+
+**Features:**
+- Send messages to multiple groups simultaneously
+- Send private messages to multiple users
+- Authentication via access token
+- Configurable server URL
+- Automatic error handling and retry
+
+**Configuration in `config.yaml`:**
+
+```yaml
+notifier:
+  onebot-11:
+    enabled: true
+    url: "http://127.0.0.1:5700"  # OneBot HTTP API server URL
+    access_token: "${ONEBOT_ACCESS_TOKEN}"  # Use environment variable for security
+    to_group_ids:  # List of group IDs to send notifications to
+      - "1016792818"
+      - "1234567890"
+    to_friend_ids:  # List of friend/user IDs to send private messages to
+      - "2014709936"
+      - "9876543210"
+```
+
+**Setup Steps:**
+
+1. Deploy an OneBot-11 compatible server (e.g., [go-cqhttp](https://github.com/Mrs4s/go-cqhttp), [OpenShamrock](https://github.com/whitechi73/OpenShamrock))
+2. Configure the server to listen on HTTP (default: `http://127.0.0.1:5700`)
+3. (Optional) Set an access token in the OneBot server for authentication
+4. Add the OneBot-11 configuration to your `config.yaml`
+5. Store your access token in `.env` file: `ONEBOT_ACCESS_TOKEN=your-secret-token`
+
+**Relevant Documentation:**
+- [OneBot-11 Protocol](https://github.com/botuniverse/onebot-11)
+- [OneBot-11 HTTP Communication](https://github.com/botuniverse/onebot-11/blob/master/communication/http.md)
+- [OneBot-11 API Reference](https://github.com/botuniverse/onebot-11/blob/master/api/public.md)
+
 
 ## Built-in Watchers
 
