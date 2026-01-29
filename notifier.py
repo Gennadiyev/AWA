@@ -170,6 +170,107 @@ class LarkNotifier(BaseNotifier):
             self.session = None
 
 
+class OneBotNotifier(BaseNotifier):
+    """OneBot-11 notifier that sends messages to OneBot v11 servers via HTTP"""
+
+    def __init__(self, config: dict):
+        super().__init__(config)
+        self.url = config.get("url", "http://127.0.0.1:5700")
+        self.access_token = config.get("access_token", "")
+        self.to_group_ids = config.get("to_group_ids", [])
+        self.to_friend_ids = config.get("to_friend_ids", [])
+
+        if not self.to_group_ids and not self.to_friend_ids:
+            logger.warning(
+                "OneBotNotifier: No group or friend IDs configured, notifications will not be sent"
+            )
+
+        self.session = None
+        logger.info(
+            f"OneBot-11 notifier initialized: {self.url} "
+            f"(groups: {len(self.to_group_ids)}, friends: {len(self.to_friend_ids)})"
+        )
+
+    async def send(self, markdown_content: str) -> None:
+        """
+        Send notification to OneBot v11 server.
+
+        Args:
+            markdown_content: The notification content in markdown format
+        """
+        if not self.enabled:
+            return
+
+        if not self.to_group_ids and not self.to_friend_ids:
+            return
+
+        try:
+            # Check if session is initialized
+            if self.session is None:
+                # Import here to avoid dependency if not using OneBotNotifier
+                import aiohttp
+
+                self.session = aiohttp.ClientSession()
+
+            # Prepare headers with access token if provided
+            headers = {}
+            if self.access_token:
+                headers["Authorization"] = f"Bearer {self.access_token}"
+
+            # Send to all configured groups
+            for group_id in self.to_group_ids:
+                payload = {"group_id": group_id, "message": markdown_content}
+                try:
+                    async with self.session.post(
+                        f"{self.url}/send_group_msg", json=payload, headers=headers
+                    ) as response:
+                        if response.status != 200:
+                            text = await response.text()
+                            logger.error(
+                                f"Failed to send OneBot group message to {group_id}: {response.status}, {text}"
+                            )
+                        else:
+                            logger.debug(
+                                f"OneBot group notification sent to {group_id}"
+                            )
+                except Exception as e:
+                    logger.error(
+                        f"Error sending OneBot group notification to {group_id}: {e}",
+                        exc_info=True,
+                    )
+
+            # Send to all configured friends
+            for friend_id in self.to_friend_ids:
+                payload = {"user_id": friend_id, "message": markdown_content}
+                try:
+                    async with self.session.post(
+                        f"{self.url}/send_private_msg", json=payload, headers=headers
+                    ) as response:
+                        if response.status != 200:
+                            text = await response.text()
+                            logger.error(
+                                f"Failed to send OneBot private message to {friend_id}: {response.status}, {text}"
+                            )
+                        else:
+                            logger.debug(
+                                f"OneBot private notification sent to {friend_id}"
+                            )
+                except Exception as e:
+                    logger.error(
+                        f"Error sending OneBot private notification to {friend_id}: {e}",
+                        exc_info=True,
+                    )
+
+        except Exception as e:
+            logger.error(f"Error in OneBot notifier: {e}", exc_info=True)
+
+    async def close(self) -> None:
+        """Close the aiohttp session"""
+        if self.session is not None:
+            await self.session.close()
+            self.session = None
+
+
 class Notifier:
     """Main notifier class that manages multiple notification providers. This class handles the configuration file and initializes the appropriate notifier instances based on the provided settings."""
 
@@ -196,6 +297,11 @@ class Notifier:
         lark_config = config.get("lark", {})
         if lark_config.get("enabled", False):
             self.notifiers.append(LarkNotifier(lark_config))
+
+        # Initialize onebot-11 notifier if configured
+        onebot_config = config.get("onebot-11", {})
+        if onebot_config.get("enabled", False):
+            self.notifiers.append(OneBotNotifier(onebot_config))
 
         logger.info(
             f"Notifier system initialized with {len(self.notifiers)} provider(s)"

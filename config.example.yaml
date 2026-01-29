@@ -34,6 +34,15 @@ notifier:
     enabled: false # Set to true to enable Lark notifications
     webhook_url: "${LARK_WEBHOOK_URL}" # Your Lark webhook URL (recommended: store in .env)
 
+  # OneBot-11 notifier - sends messages to OneBot v11 servers (supports QQ, Discord, Lark, etc.)
+  # See: https://github.com/botuniverse/onebot-11
+  onebot-11:
+    enabled: false # Set to true to enable OneBot-11 notifications
+    url: "http://127.0.0.1:5700" # OneBot HTTP API server URL
+    access_token: "${ONEBOT_ACCESS_TOKEN}" # Access token for authentication (recommended: store in .env)
+    to_group_ids: [] # List of group IDs to send notifications to, e.g., ["1016792818", "1234567890"]
+    to_friend_ids: [] # List of friend/user IDs to send notifications to, e.g., ["2014709936", "9876543210"]
+
 # Watchers configuration
 watchers:
   # IMAP Email Watcher
