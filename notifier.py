@@ -72,11 +72,12 @@ class NtfyNotifier(BaseNotifier):
         super().__init__(config)
         self.url = config.get("url", "https://ntfy.sh")
         self.topic = config.get("topic", "reborn")
+        self.token = config.get("auth_token")
 
         # Import here to avoid dependency if not using ntfy
         from python_ntfy import NtfyClient
 
-        self.client = NtfyClient(topic=self.topic, server=self.url)
+        self.client = NtfyClient(topic=self.topic, server=self.url, auth=self.token)
         logger.info(f"Ntfy notifier initialized: {self.url}/{self.topic}")
 
     async def send(self, markdown_content: str) -> None:
