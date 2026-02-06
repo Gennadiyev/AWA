@@ -68,6 +68,93 @@ class SystemMonitor:
         ram_percent = memory.percent
         return cpu_percent, ram_percent, memory
 
+    def get_top_processes_by_cpu(self, top_n: int = 5) -> list[dict[str, Any]]:
+        """
+        Get top N processes consuming the most CPU.
+
+        Args:
+            top_n: Number of top processes to return
+
+        Returns:
+            List of dictionaries with process information (pid, name, cpu_percent)
+        """
+        processes = []
+        try:
+            for proc in psutil.process_iter(['pid', 'name', 'cpu_percent']):
+                try:
+                    pinfo = proc.info
+                    if pinfo['cpu_percent'] is not None:
+                        processes.append(pinfo)
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+        except Exception as e:
+            logger.error(f"Error getting top CPU processes: {e}")
+            return []
+
+        # Sort by CPU usage and return top N
+        processes.sort(key=lambda x: x['cpu_percent'], reverse=True)
+        return processes[:top_n]
+
+    def get_top_processes_by_memory(self, top_n: int = 5) -> list[dict[str, Any]]:
+        """
+        Get top N processes consuming the most memory.
+
+        Args:
+            top_n: Number of top processes to return
+
+        Returns:
+            List of dictionaries with process information (pid, name, memory_percent, memory_mb)
+        """
+        processes = []
+        try:
+            for proc in psutil.process_iter(['pid', 'name', 'memory_percent', 'memory_info']):
+                try:
+                    pinfo = proc.info
+                    if pinfo['memory_percent'] is not None:
+                        # Add memory in MB for better readability
+                        pinfo['memory_mb'] = pinfo['memory_info'].rss / (1024 * 1024)
+                        processes.append(pinfo)
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+        except Exception as e:
+            logger.error(f"Error getting top memory processes: {e}")
+            return []
+
+        # Sort by memory usage and return top N
+        processes.sort(key=lambda x: x['memory_percent'], reverse=True)
+        return processes[:top_n]
+
+    def format_process_leaderboard(
+        self, processes: list[dict[str, Any]], metric_type: str
+    ) -> str:
+        """
+        Format process information as a markdown leaderboard.
+
+        Args:
+            processes: List of process dictionaries
+            metric_type: Type of metric ('cpu' or 'memory')
+
+        Returns:
+            Formatted markdown string
+        """
+        if not processes:
+            return "_No process information available_"
+
+        leaderboard = "\n**Top Consuming Processes:**\n"
+        for i, proc in enumerate(processes, 1):
+            name = proc.get('name', 'Unknown')
+            pid = proc.get('pid', '?')
+
+            if metric_type == 'cpu':
+                usage = proc.get('cpu_percent', 0)
+                leaderboard += f"{i}. `{name}` (PID: {pid}) - {usage:.1f}%\n"
+            elif metric_type == 'memory':
+                usage_pct = proc.get('memory_percent', 0)
+                usage_mb = proc.get('memory_mb', 0)
+                leaderboard += f"{i}. `{name}` (PID: {pid}) - {usage_pct:.1f}% ({usage_mb:.0f} MB)\n"
+
+        return leaderboard
+
     def should_send_alert(self, last_alert_time: float) -> bool:
         """
         Check if enough time has passed since the last alert.
@@ -89,12 +176,19 @@ class SystemMonitor:
             cpu_percent: Current CPU usage percentage
         """
         logger.warning(f"CPU usage high: {cpu_percent:.1f}%")
+
+        # Get top CPU-consuming processes
+        top_processes = self.get_top_processes_by_cpu(top_n=5)
+        process_leaderboard = self.format_process_leaderboard(top_processes, 'cpu')
+
         markdown_content = f"""# ⚠️ High CPU Usage
 
 **Current Usage:** {cpu_percent:.1f}%
 **Threshold:** {self.cpu_threshold}%
 
 CPU usage has exceeded the configured threshold.
+
+{process_leaderboard}
 """
         await self.notifier.send(markdown_content)
         self.last_cpu_alert_time = time.time()
@@ -114,6 +208,10 @@ CPU usage has exceeded the configured threshold.
         used_gb = memory.used / (1024**3)
         available_gb = memory.available / (1024**3)
 
+        # Get top memory-consuming processes
+        top_processes = self.get_top_processes_by_memory(top_n=5)
+        process_leaderboard = self.format_process_leaderboard(top_processes, 'memory')
+
         markdown_content = f"""# ⚠️ High RAM Usage
 
 **Current Usage:** {ram_percent:.1f}%
@@ -123,6 +221,8 @@ CPU usage has exceeded the configured threshold.
 **Available:** {available_gb:.2f} GB
 
 RAM usage has exceeded the configured threshold.
+
+{process_leaderboard}
 """
         await self.notifier.send(markdown_content)
         self.last_ram_alert_time = time.time()
